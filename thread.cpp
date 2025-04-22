@@ -19,6 +19,7 @@ private:
     std::condition_variable condition;
     bool stop;
 
+
 public:
     // 构造函数，size为线程池大小
     ThreadPool(size_t size) : stop(false) {
@@ -101,7 +102,7 @@ public:
 int main() {
     // 创建一个有4个线程的线程池
     ThreadPool pool(4);
-    
+
     
     // 创建一些future来获取结果
     std::vector<std::future<int>> results;
