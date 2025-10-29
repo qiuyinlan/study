@@ -7,11 +7,26 @@
         body { font-family: Arial, sans-serif; max-width: 1200px; margin: 0 auto; padding: 20px; }
         .header { background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
         .fund-list { margin-top: 20px; }
+        .group-section { margin-bottom: 30px; }
+        .group-title { 
+            background-color: #e9f5ff; 
+            padding: 10px 15px; 
+            border-radius: 4px; 
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #0066cc;
+        }
         .fund-item { 
             padding: 15px; 
             border-bottom: 1px solid #eee; 
             margin-bottom: 10px;
+            display: flex; /* 左右布局核心 */
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
         }
+        .fund-left { flex: 1; min-width: 300px; } /* 左侧信息 */
+        .fund-right { flex: 2; min-width: 600px; } /* 右侧信号和操作区 */
         .fund-header {
             display: flex; 
             justify-content: space-between; 
@@ -32,21 +47,22 @@
         .clear-btn { background-color: #dc3545; color: white; }
         .clear-btn:hover { background-color: #bb2d3b; }
         .checkbox { width: 18px; height: 18px; cursor: pointer; margin-right: 10px; }
-        .reason-text { color: #ff0000; margin-left: auto; } /* 理由居右显示（红色） */
+        .reason-text { color: #ff0000; margin-left: 15px; } /* 理由在右侧区域展示 */
         .change-pct { 
             padding: 3px 8px; 
             border-radius: 3px; 
             font-weight: 500; 
+            margin-right: 15px;
         }
-        .rise { color: #d93025; background-color: #fff1f0; } /* 上涨：深红色文字+浅红背景 */
-        .fall { color: #0f9d58; background-color: #e6f4ea; } /* 下跌：深绿色文字+浅绿背景 */
-        .flat { color: #666; background-color: #f5f5f5; } /* 持平：灰色 */
+        .rise { color: #d93025; background-color: #fff1f0; }
+        .fall { color: #0f9d58; background-color: #e6f4ea; }
+        .flat { color: #666; background-color: #f5f5f5; }
         .notes-container { 
             margin-top: 8px; 
             padding: 10px; 
             background-color: #f8f9fa; 
             border-radius: 4px;
-            display: none; /* 默认隐藏 */
+            display: none;
         }
         .notes-input { 
             width: 100%; 
@@ -66,6 +82,7 @@
             border-radius: 3px;
             cursor: pointer;
         }
+        .stat-info { display: flex; align-items: center; margin-bottom: 8px; }
     </style>
 </head>
 <body>
@@ -74,16 +91,15 @@
         <p>实时展示基金涨跌数据及投资信号分析</p>
     </div>
 
-    <!-- <div class="api-links">
+    <div class="api-links">
         <h3>API 接口参考</h3>
         <ul>
             <li>所有基金列表：<a href="/api/funds" target="_blank">/api/funds</a></li>
             <li>所有基金信号：<a href="/api/funds/signals" target="_blank">/api/funds/signals</a></li>
             <li>单只基金详情（示例）：<a href="/api/fund/019020" target="_blank">/api/fund/019020</a></li>
         </ul>
-    </div> -->
+    </div>
 
-    <!-- 操作栏：导出和清除按钮 -->
     <div class="action-bar">
         <button class="export-btn" onclick="exportRecords()">导出操作记录</button>
         <button class="clear-btn" onclick="clearAllRecords()">清除所有记录</button>
@@ -96,11 +112,10 @@
     </div>
 
     <script>
-        // 存储操作记录（格式：{code: {name, notes, date}}）
         let operationRecords = JSON.parse(localStorage.getItem('fundNotes') || '{}');
         let allFunds = [];
 
-        // 页面加载时获取基金数据
+        // 从接口获取数据后，先分组排序再渲染
         fetch('/api/funds/signals')
             .then(response => {
                 if (!response.ok) throw new Error("数据加载失败");
@@ -108,61 +123,103 @@
             })
             .then(data => {
                 allFunds = data;
-                renderFundList(data);
+                const { thresholdFunds, normalFunds } = groupAndSortFunds(data); // 分组排序
+                renderFundList(thresholdFunds, normalFunds); // 渲染分组后的列表
                 updateRecordedCount();
             })
             .catch(error => {
                 document.getElementById('fundSignals').innerHTML = `<p>错误：${error.message}</p>`;
             });
 
-        // 渲染基金列表
-        function renderFundList(funds) {
+        // 分组和排序逻辑（按涨跌幅阈值分组，组内按绝对值排序）
+        function groupAndSortFunds(funds) {
+            // 1. 分组：超阈值（涨跌幅绝对值 >= 3%）和普通基金
+            const thresholdFunds = funds.filter(fund => Math.abs(fund.daily_change_pct) >= 3);
+            const normalFunds = funds.filter(fund => Math.abs(fund.daily_change_pct) < 3);
+
+            // 2. 组内排序：按涨跌幅绝对值从大到小
+            const sortByChangeAbs = (a, b) => Math.abs(b.daily_change_pct) - Math.abs(a.daily_change_pct);
+            
+            return {
+                thresholdFunds: thresholdFunds.sort(sortByChangeAbs),
+                normalFunds: normalFunds.sort(sortByChangeAbs)
+            };
+        }
+
+        // 渲染分组后的基金列表（先显示超阈值组，再显示普通组）
+        function renderFundList(thresholdFunds, normalFunds) {
             const container = document.getElementById('fundSignals');
             container.innerHTML = '';
 
-            funds.forEach(fund => {
-                const isRecorded = !!operationRecords[fund.code];
-                const notes = operationRecords[fund.code]?.notes || '';
+            // 1. 渲染超阈值组
+            if (thresholdFunds.length > 0) {
+                const thresholdSection = document.createElement('div');
+                thresholdSection.className = 'group-section';
+                thresholdSection.innerHTML = `<div class="group-title">📊 单日涨跌超阈值（${thresholdFunds.length}只）</div>`;
+                thresholdFunds.forEach(fund => {
+                    thresholdSection.appendChild(createFundItem(fund));
+                });
+                container.appendChild(thresholdSection);
+            }
 
-                // 单日涨跌幅样式判断（上涨/下跌/持平）
-                let changeClass = 'flat';
-                if (fund.daily_change_pct > 0) changeClass = 'rise';
-                else if (fund.daily_change_pct < 0) changeClass = 'fall';
+            // 2. 渲染普通组
+            if (normalFunds.length > 0) {
+                const normalSection = document.createElement('div');
+                normalSection.className = 'group-section';
+                normalSection.innerHTML = `<div class="group-title">📋 普通涨跌基金（${normalFunds.length}只）</div>`;
+                normalFunds.forEach(fund => {
+                    normalSection.appendChild(createFundItem(fund));
+                });
+                container.appendChild(normalSection);
+            }
+        }
 
-                const item = document.createElement('div');
-                item.className = 'fund-item';
-                item.innerHTML = `
-                    <!-- 基金基本信息和理由 -->
-                    <div class="fund-header">
-                        <div style="display: flex; align-items: center;">
-                            <input type="checkbox" class="checkbox" data-code="${fund.code}" ${isRecorded ? 'checked' : ''}
-                                onchange="toggleNotes('${fund.code}')">
-                            <strong>${fund.name}</strong>（${fund.code}）
-                        </div>
-                        <div>
-                            当日涨跌：<span class="change-pct ${changeClass}">${fund.daily_change_pct.toFixed(2)}%</span> | 连续${fund.consecutive_days}天
-                        </div>
-                        <div class="reason-text">${fund.reasons}</div> <!-- 理由移到右侧 -->
+        // 创建单个基金项（左右布局）
+        function createFundItem(fund) {
+            const isRecorded = !!operationRecords[fund.code];
+            const notes = operationRecords[fund.code]?.notes || '';
+
+            let changeClass = 'flat';
+            if (fund.daily_change_pct > 0) changeClass = 'rise';
+            else if (fund.daily_change_pct < 0) changeClass = 'fall';
+
+            const item = document.createElement('div');
+            item.className = 'fund-item';
+            item.innerHTML = `
+                <!-- 左侧：基金基本信息 -->
+                <div class="fund-left">
+                    <div style="display: flex; align-items: center;">
+                        <input type="checkbox" class="checkbox" data-code="${fund.code}" ${isRecorded ? 'checked' : ''}
+                            onchange="toggleNotes('${fund.code}')">
+                        <strong>${fund.name}</strong>（${fund.code}）
                     </div>
+                </div>
 
-                    <!-- 备注输入区域（默认隐藏） -->
+                <!-- 右侧：信号、涨跌幅、理由和操作区 -->
+                <div class="fund-right">
+                    <div class="stat-info">
+                        <span class="change-pct ${changeClass}">${fund.daily_change_pct.toFixed(2)}%</span>
+                        <span>连续${fund.consecutive_days}天</span>
+                        <span class="reason-text">${fund.reasons}</span>
+                    </div>
+                    
+                    <!-- 备注区域 -->
                     <div class="notes-container" id="notes-${fund.code}" style="display: ${isRecorded ? 'block' : 'none'}">
                         <textarea class="notes-input" placeholder="请输入操作思考...">${notes}</textarea>
                         <button class="notes-save" onclick="saveNotes('${fund.code}')">保存备注</button>
                     </div>
-                `;
-                container.appendChild(item);
-            });
+                </div>
+            `;
+            return item;
         }
 
-        // 切换备注区域显示/隐藏
+        // 切换备注显示/隐藏（复用你的逻辑）
         function toggleNotes(fundCode) {
             const notesContainer = document.getElementById(`notes-${fundCode}`);
             const isChecked = document.querySelector(`.checkbox[data-code="${fundCode}"]`).checked;
             
             if (isChecked) {
                 notesContainer.style.display = 'block';
-                // 首次勾选时添加空记录
                 if (!operationRecords[fundCode]) {
                     const fund = allFunds.find(f => f.code === fundCode);
                     operationRecords[fundCode] = {
@@ -178,18 +235,18 @@
             saveToLocalStorage();
         }
 
-        // 保存备注
+        // 保存备注（复用你的逻辑）
         function saveNotes(fundCode) {
             const notes = document.querySelector(`#notes-${fundCode} .notes-input`).value;
             if (operationRecords[fundCode]) {
                 operationRecords[fundCode].notes = notes;
-                operationRecords[fundCode].date = new Date().toLocaleDateString(); // 更新日期
+                operationRecords[fundCode].date = new Date().toLocaleDateString();
                 saveToLocalStorage();
                 alert("备注已保存");
             }
         }
 
-        // 保存到本地存储（刷新页面不丢失）
+        // 保存到本地存储
         function saveToLocalStorage() {
             localStorage.setItem('fundNotes', JSON.stringify(operationRecords));
             updateRecordedCount();
@@ -200,20 +257,19 @@
             document.getElementById('recordedCount').textContent = Object.keys(operationRecords).length;
         }
 
-        // 导出记录（日期显示在最上面）
+        // 导出记录（仅基金名称+操作）
         function exportRecords() {
             if (Object.keys(operationRecords).length === 0) {
                 alert("没有可导出的记录");
                 return;
             }
 
-            // 获取当前日期作为记录日期（显示在最上面）
             const today = new Date().toLocaleDateString();
-            let content = `操作记录日期：${today}\n\n`; // 日期显示在最顶部
+            let content = `===== 基金操作记录（${today}）=====\n\n`;
             
-            // 遍历记录添加内容
             Object.values(operationRecords).forEach(record => {
-                content += `${record.name}：${record.notes || '无备注'}\n`;
+                content += `1. ${record.name}\n`;
+                content += `   操作：${record.notes || '无'}\n\n`;
             });
 
             const blob = new Blob([content], { type: 'text/plain' });
@@ -230,7 +286,9 @@
             if (confirm("确定要清除所有记录吗？")) {
                 operationRecords = {};
                 localStorage.removeItem('fundNotes');
-                renderFundList(allFunds);
+                // 重新渲染列表（保持分组排序）
+                const { thresholdFunds, normalFunds } = groupAndSortFunds(allFunds);
+                renderFundList(thresholdFunds, normalFunds);
                 updateRecordedCount();
             }
         }

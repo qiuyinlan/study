@@ -40,10 +40,7 @@
         .clear-btn { background-color: #dc3545; color: white; }
         .clear-btn:hover { background-color: #bb2d3b; }
         .checkbox { width: 18px; height: 18px; cursor: pointer; margin-right: 10px; }
-        /* 新增：理由文字颜色类（粉色、橙色、默认红色） */
-        .reason-daily { color: #ff69b4; } /* 单日超阈值：粉色 */
-        .reason-consecutive { color: #ff9900; } /* 连续超阈值：橙色 */
-        .reason-both { color: #ff0000; } /* 双超阈值：保持原红色 */
+        .reason-text { color: #ff0000; margin-left: 15px; }
         .change-pct { 
             padding: 3px 8px; 
             border-radius: 3px; 
@@ -209,16 +206,6 @@
                 thresholdLabel = '<span class="threshold-label both-threshold">双超阈值</span>';
             }
 
-            // 核心修改：根据超阈值类型设置理由文字颜色
-            let reasonClass = '';
-            if (fund.thresholdType === 'daily') {
-                reasonClass = 'reason-daily'; // 单日超阈值：粉色
-            } else if (fund.thresholdType === 'consecutive') {
-                reasonClass = 'reason-consecutive'; // 连续超阈值：橙色
-            } else {
-                reasonClass = 'reason-daily'; // 双超阈值：粉
-            }
-
             const item = document.createElement('div');
             item.className = 'fund-item';
             item.innerHTML = `
@@ -231,13 +218,12 @@
                     </div>
                 </div>
 
-                <!-- 右侧：涨跌幅、理由和操作区 -->
+                <!-- 右侧：涨跌幅、连续天数、理由和操作区 -->
                 <div class="fund-right">
                     <div class="stat-info">
                         <span class="change-pct ${changeClass}">${fund.daily_change_pct.toFixed(2)}%</span>
-                        ${thresholdLabel}
-                        <!-- 核心修改：应用动态颜色类 -->
-                        <span class="reason-text ${reasonClass}">${fund.reasons}</span>
+                   
+                        <span class="reason-text">${fund.reasons}</span>
                     </div>
                     
                     <!-- 备注区域 -->
