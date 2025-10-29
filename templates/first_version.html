@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>基金信号分析平台</title>
+    <style>
+        /* 全局样式重置和基础设置 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        /* 头部样式 */
+        .header {
+            background: linear-gradient(135deg, #4a90e2, #5b6ef7);
+            color: white;
+            padding: 25px 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 15px;
+        }
+
+        /* API链接区域 */
+        .api-links {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .api-links h3 {
+            color: #4a90e2;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+        .api-links ul {
+            list-style-position: inside;
+            padding-left: 5px;
+        }
+        .api-links li {
+            margin: 6px 0;
+        }
+        .api-links a {
+            color: #4a90e2;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        .api-links a:hover {
+            color: #357abd;
+            text-decoration: underline;
+        }
+
+        /* 操作按钮区域 */
+        .action-bar {
+            background-color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+        .export-btn, .clear-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .export-btn {
+            background-color: #4a90e2;
+            color: white;
+        }
+        .export-btn:hover {
+            background-color: #357abd;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(74, 144, 226, 0.2);
+        }
+        .clear-btn {
+            background-color: #f55a4e;
+            color: white;
+        }
+        .clear-btn:hover {
+            background-color: #e04a3f;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(245, 90, 78, 0.2);
+        }
+        .record-count {
+            color: #666;
+            font-size: 14px;
+        }
+
+        /* 基金列表标题 */
+        .section-title {
+            font-size: 20px;
+            margin-bottom: 15px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background-color: #4a90e2;
+            border-radius: 2px;
+        }
+
+        /* 基金条目样式 */
+        .fund-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .fund-item {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.07);
+            transition: transform 0.2s, box-shadow 0.2s;
+            overflow: hidden;
+        }
+        .fund-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .fund-header {
+            display: flex;
+            flex-wrap: wrap; /* 适配小屏幕 */
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .fund-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #4a90e2; /* 复选框颜色 */
+            transition: transform 0.1s;
+        }
+        .checkbox:checked {
+            transform: scale(1.1);
+        }
+        .fund-name {
+            font-weight: 600;
+            font-size: 16px;
+            color: #333;
+        }
+        .fund-code {
+            color: #888;
+            font-size: 14px;
+            margin-left: 5px;
+        }
+
+        /* 涨跌幅样式 */
+        .change-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        .change-pct {
+            padding: 4px 10px;
+            border-radius: 20px; /* 圆形边角更美观 */
+            font-weight: 600;
+            font-size: 13px;
+        }
+        .rise { 
+            color: #f55a4e; 
+            background-color: rgba(245, 90, 78, 0.1); 
+        }
+        .fall { 
+            color: #28a745; 
+            background-color: rgba(40, 167, 69, 0.1); 
+        }
+        .flat { 
+            color: #666; 
+            background-color: #f0f0f0; 
+        }
+
+        /* 理由样式 */
+        .reason-text {
+            color: #f55a4e;
+            font-weight: 500;
+            font-size: 14px;
+            white-space: nowrap; /* 防止理由换行 */
+        }
+
+        /* 备注输入区域 */
+        .notes-container {
+            margin-top: 12px;
+            padding: 15px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+            border-left: 3px solid #4a90e2;
+            display: none;
+            animation: fadeIn 0.3s ease; /* 显示动画 */
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .notes-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            min-height: 80px;
+            resize: vertical;
+            font-size: 14px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .notes-input:focus {
+            outline: none;
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+        .notes-save {
+            margin-top: 10px;
+            padding: 8px 16px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .notes-save:hover {
+            background-color: #357abd;
+        }
+
+        /* 加载中样式 */
+        .loading {
+            text-align: center;
+            padding: 50px 0;
+            color: #888;
+            font-size: 16px;
+        }
+        .loading::after {
+            content: '';
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(74, 144, 226, 0.3);
+            border-radius: 50%;
+            border-top-color: #4a90e2;
+            margin-left: 10px;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>基金信号分析平台</h1>
+        <p>实时展示基金涨跌数据及投资信号分析</p>
+    </div>
+
+    <div class="api-links">
+        <h3>API 接口参考</h3>
+        <ul>
+            <li>所有基金列表：<a href="/api/funds" target="_blank">/api/funds</a></li>
+            <li>所有基金信号：<a href="/api/funds/signals" target="_blank">/api/funds/signals</a></li>
+            <li>单只基金详情（示例）：<a href="/api/fund/019020" target="_blank">/api/fund/019020</a></li>
+        </ul>
+    </div>
+
+    <div class="action-bar">
+        <div class="btn-group">
+            <button class="export-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                导出操作记录
+            </button>
+            <button class="clear-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                清除所有记录
+            </button>
+        </div>
+        <div class="record-count">
+            已记录 <span id="recordedCount">0</span> 只基金
+        </div>
+    </div>
+
+    <h2 class="section-title">基金信号列表</h2>
+    <div class="fund-list" id="fundSignals">
+        <div class="loading">加载中</div>
+    </div>
+
+    <script>
+        // 存储操作记录（本地存储，刷新不丢失）
+        let operationRecords = JSON.parse(localStorage.getItem('fundNotes') || '{}');
+        let allFunds = [];
+
+        // 加载基金数据
+        fetch('/api/funds/signals')
+            .then(response => {
+                if (!response.ok) throw new Error("数据加载失败");
+                return response.json();
+            })
+            .then(data => {
+                allFunds = data;
+                renderFundList(data);
+                updateRecordedCount();
+            })
+            .catch(error => {
+                document.getElementById('fundSignals').innerHTML = `<p style="text-align:center;padding:30px;color:#888;">错误：${error.message}</p>`;
+            });
+
+        // 渲染基金列表
+        function renderFundList(funds) {
+            const container = document.getElementById('fundSignals');
+            container.innerHTML = '';
+
+            funds.forEach(fund => {
+                const isRecorded = !!operationRecords[fund.code];
+                const notes = operationRecords[fund.code]?.notes || '';
+
+                // 判断涨跌幅样式
+                let changeClass = 'flat';
+                if (fund.daily_change_pct > 0) changeClass = 'rise';
+                else if (fund.daily_change_pct < 0) changeClass = 'fall';
+
+                const item = document.createElement('div');
+                item.className = 'fund-item';
+                item.innerHTML = `
+                    <div class="fund-header">
+                        <div class="fund-info">
+                            <input type="checkbox" class="checkbox" data-code="${fund.code}" ${isRecorded ? 'checked' : ''}
+                                onchange="toggleNotes('${fund.code}')">
+                            <span class="fund-name">${fund.name}<span class="fund-code">(${fund.code})</span></span>
+                        </div>
+                        <div class="change-info">
+                            <span>当日涨跌：<span class="change-pct ${changeClass}">${fund.daily_change_pct.toFixed(2)}%</span></span>
+                            <span>连续${fund.consecutive_days}天</span>
+                        </div>
+                        <div class="reason-text">${fund.reasons}</div>
+                    </div>
+                    <div class="notes-container" id="notes-${fund.code}" style="display: ${isRecorded ? 'block' : 'none'}">
+                        <textarea class="notes-input" placeholder="请输入操作思考（例如：今日加仓1000元，长期看好）...">${notes}</textarea>
+                        <button class="notes-save" onclick="saveNotes('${fund.code}')">保存备注</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // 切换备注区域显示/隐藏
+        function toggleNotes(fundCode) {
+            const notesContainer = document.getElementById(`notes-${fundCode}`);
+            const isChecked = document.querySelector(`.checkbox[data-code="${fundCode}"]`).checked;
+            
+            if (isChecked) {
+                notesContainer.style.display = 'block';
+                if (!operationRecords[fundCode]) {
+                    const fund = allFunds.find(f => f.code === fundCode);
+                    operationRecords[fundCode] = {
+                        name: fund.name,
+                        notes: '',
+                        date: new Date().toLocaleDateString()
+                    };
+                }
+            } else {
+                notesContainer.style.display = 'none';
+            }
+            updateRecordedCount();
+            saveToLocalStorage();
+        }
+
+        // 保存备注
+        function saveNotes(fundCode) {
+            const notes = document.querySelector(`#notes-${fundCode} .notes-input`).value;
+            if (operationRecords[fundCode]) {
+                operationRecords[fundCode].notes = notes;
+                operationRecords[fundCode].date = new Date().toLocaleDate

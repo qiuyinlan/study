@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>基金监控列表</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            background: linear-gradient(135deg, #4a90e2, #5b6ef7);
+            color: white;
+            padding: 20px 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .action-bar {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+        .export-btn, .clear-btn, .refresh-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s;
+        }
+        .export-btn {
+            background-color: #4a90e2;
+            color: white;
+        }
+        .export-btn:hover {
+            background-color: #357abd;
+        }
+        .clear-btn {
+            background-color: #f55a4e;
+            color: white;
+        }
+        .clear-btn:hover {
+            background-color: #e04a3f;
+        }
+        .refresh-btn {
+            background-color: #28a745;
+            color: white;
+        }
+        .refresh-btn:hover {
+            background-color: #218838;
+        }
+        .fund-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .fund-item {
+            background: white;
+            border-radius: 8px;
+            padding: 15px 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .fund-info {
+            flex: 1;
+            min-width: 250px;
+        }
+        .fund-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        .fund-code {
+            color: #888;
+            font-size: 14px;
+        }
+        .fund-stats {
+            display: flex;
+            gap: 20px;
+            padding: 5px 0;
+            flex-wrap: wrap;
+            min-width: 300px;
+        }
+        .stat-item {
+            color: #666;
+            font-size: 14px;
+        }
+        .stat-item .value {
+            font-weight: 500;
+            margin-left: 4px;
+        }
+        .rise {
+            color: #f55a4e;
+        }
+        .fall {
+            color: #28a745;
+        }
+        .threshold-tag {
+            background-color: #fff0f0;
+            color: #f55a4e;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-left: 8px;
+            display: inline-block;
+        }
+        .notes-section {
+            width: 100%;
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .notes-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            min-height: 40px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .notes-input:focus {
+            outline: none;
+            border-color: #4a90e2;
+        }
+        .save-btn {
+            padding: 8px 16px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .save-btn:hover {
+            background-color: #357abd;
+        }
+        .section-title {
+            font-size: 18px;
+            margin: 20px 0 10px;
+            color: #4a90e2;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .section-title::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 16px;
+            background-color: #4a90e2;
+            border-radius: 2px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>基金监控列表</h1>
+        </div>
+        <div class="action-bar">
+            <div class="btn-group">
+                <button class="refresh-btn" onclick="fetchAndRenderFunds()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"></path>
+                        <path d="M1 20v-6h6"></path>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    刷新数据
+                </button>
+                <button class="export-btn" onclick="exportRecords()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    导出记录
+                </button>
+                <button class="clear-btn" onclick="clearAllRecords()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                    清除记录
+                </button>
+            </div>
+            <div class="record-count">
+                已记录 <span id="recordedCount">0</span> 条备注
+            </div>
+        </div>
+
+        <div id="funds-container">
+            <div class="loading">加载中...</div>
+        </div>
+    </div>
+
+    <script>
+        // 本地存储备注
+        let fundNotes = JSON.parse(localStorage.getItem('fundNotes') || '{}');
+        let currentFunds = []; // 存储当前加载的基金数据
+
+        // 页面加载时自动获取并渲染数据
+        window.onload = fetchAndRenderFunds;
+
+        // 从数据源获取基金数据（模拟接口，实际项目替换为真实接口）
+        async function fetchFundData() {
+            // 模拟API请求延迟
+            await new Promise(resolve => setTimeout(resolve, 800));
+            
+            // 模拟动态获取的基金数据（实际项目中这里会是接口返回的数据）
+            return [
+                { code: "516880", name: "银华中证光伏产业ETF联接C", dailyChange: "7.99%", continuousDays: 3, totalChange: "7.99%", isThreshold: true },
+                { code: "002984", name: "广发中证环保产业ETF联接C", dailyChange: "5.35%", continuousDays: 3, totalChange: "5.35%", isThreshold: true },
+                { code: "013943", name: "华宝中证稀有金属主题指数增强C", dailyChange: "4.15%", continuousDays: 0, totalChange: "4.15%", isThreshold: true },
+                { code: "013852", name: "中信建投低碳成长混合C", dailyChange: "3.81%", continuousDays: 3, totalChange: "3.81%", isThreshold: true },
+                { code: "019020", name: "易方达医疗保健行业混合C", dailyChange: "0.19%", continuousDays: 2, totalChange: "0.31%", isThreshold: false, notes: "1111" },
+                { code: "017974", name: "易方达港股通优质增长混合C", dailyChange: "1.14%", continuousDays: 3, totalChange: "2.71%", isThreshold: false },
+                { code: "020973", name: "易方达机器人ETF联接C", dailyChange: "0.89%", continuousDays: 3, totalChange: "4.25%", isThreshold: false },
+                { code: "012868", name: "易方达标普信息科技指数(QDII-LOF)C", dailyChange: "0.00%", continuousDays: 4, totalChange: "2.11%", isThreshold: false },
+                { code: "517520", name: "永赢中证沪深港黄金产业股票ETF联接C", dailyChange: "2.61%", continuousDays: 2, totalChange: "2.61%", isThreshold: true },
+                { code: "019412", name: "长城新兴产业灵活配置混合C", dailyChange: "2.19%", continuousDays: 3, totalChange: "2.19%", isThreshold: true, notes: "111" },
+                { code: "013273", name: "招商沪深300地产等权重C", dailyChange: "2.62%", continuousDays: 5, totalChange: "2.62%", isThreshold: true },
+                { code: "015897", name: "天弘中证细分化工产业主题指数C", dailyChange: "2.83%", continuousDays: 3, totalChange: "2.83%", isThreshold: true },
+                { code: "003096", name: "中欧医疗健康混合C", dailyChange: "1.57%", continuousDays: 3, totalChange: "1.57%", isThreshold: true },
+                { code: "023565", name: "易方达人工智能ETF联接C", dailyChange: "0.09%", continuousDays: 3, totalChange: "3.58%", isThreshold: false },
+                { code: "512170", name: "华宝中证医疗ETF联接C", dailyChange: "1.01%", continuousDays: 3, totalChange: "2.36%", isThreshold: false },
+            ];
+        }
+
+        // 排序基金数据
+        function sortFunds(funds) {
+            // 1. 按是否超阈值分组
+            const thresholdFunds = funds.filter(fund => fund.isThreshold);
+            const continuousFunds = funds.filter(fund => !fund.isThreshold);
+            
+            // 2. 每组内按涨跌幅绝对值从大到小排序
+            const sortByChange = (a, b) => {
+                // 提取涨跌幅数值（去掉%和符号）
+                const valA = Math.abs(parseFloat(a.dailyChange));
+                const valB = Math.abs(parseFloat(b.dailyChange));
+                return valB - valA; // 降序排列
+            };
+            
+            return {
+                thresholdFunds: thresholdFunds.sort(sortByChange),
+                continuousFunds: continuousFunds.sort(sortByChange)
+            };
+        }
+
+        // 获取并渲染基金数据
+        async function fetchAndRenderFunds() {
+            const container = document.getElementById('funds-container');
+            container.innerHTML = '<div class="loading">加载中...</div>';
+            
+            try {
+                // 1. 获取原始数据
+                const rawFunds = await fetchFundData();
+                currentFunds = rawFunds; // 保存当前数据用于导出
+                
+                // 2. 排序数据
+                const { thresholdFunds, continuousFunds } = sortFunds(rawFunds);
+                
+                // 3. 渲染数据
+                container.innerHTML = `
+                    <h3 class="section-title">单日涨跌超阈值 (${thresholdFunds.length})</h3>
+                    <div class="fund-list" id="threshold-funds"></div>
+                    
+                    <h3 class="section-title">连续涨跌 (${continuousFunds.length})</h3>
+                    <div class="fund-list" id="continuous-funds"></div>
+                `;
+                
+                const thresholdContainer = document.getElementById('threshold-funds');
+                const continuousContainer = document.getElementById('continuous-funds');
+                
+                // 渲染超阈值基金
+                thresholdFunds.forEach(fund => {
+                    thresholdContainer.appendChild(createFundElement(fund));
+                });
+                
+                // 渲染连续涨跌基金
+                continuousFunds.forEach(fund => {
+                    continuousContainer.appendChild(createFundElement(fund));
+                });
+                
+                updateRecordCount();
+                
+            } catch (error) {
+                container.innerHTML = `<div class="loading" style="color: #f55a4e;">加载失败，请点击刷新重试</div>`;
+                console.error('数据加载失败:', error);
+            }
+        }
+
+        // 创建单个基金元素
+        function createFundElement(fund) {
+            const fundElement = document.createElement('div');
+            fundElement.className = 'fund-item';
+            
+            // 判断涨跌颜色
+            const dailyChangeClass = fund.dailyChange.startsWith('-') ? 'fall' : 'rise';
+            const totalChangeClass = fund.totalChange && fund.totalChange.startsWith('-') ? 'fall' : 'rise';
+
+            fundElement.innerHTML = `
+                <div class="fund-info">
+                    <div class="fund-name">${fund.name}</div>
+                    <div class="fund-code">${fund.code}</div>
+                </div>
+                <div class="fund-stats">
+                    <div class="stat-item">
+                        当日涨跌：<span class="value ${dailyChangeClass}">${fund.dailyChange}</span>
+                        ${fund.isThreshold ? '<span class="threshold-tag">超阈值</span>' : ''}
+                    </div>
+                    <div class="stat-item">
+                        连续${fund.continuousDays || 0}天
+                    </div>
+                    ${fund.totalChange ? `
+                        <div class="stat-item">
+                            连续${fund.continuousDays}天同向涨跌：<span class="value ${totalChangeClass}">${fund.totalChange}</span>
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="notes-section">
+                    <textarea class="notes-input" placeholder="输入备注..." data-code="${fund.code}">${fundNotes[fund.code] || ''}</textarea>
+                    <button class="save-btn" onclick="saveNote('${fund.code}')">保存备注</button>
+                </div>
+            `;
+            
+            return fundElement;
+        }
+
+        // 保存备注
+        function saveNote(code) {
+            const input = document.querySelector(`.notes-input[data-code="${code}"]`);
+            fundNotes[code] = input.value;
+            localStorage.setItem('fundNotes', JSON.stringify(fundNotes));
+            alert('备注已保存');
+            updateRecordCount();
+        }
+
+        // 导出记录
+        function exportRecords() {
+            if (currentFunds.length === 0) {
+                alert('暂无数据可导出');
+                return;
+            }
+            
+            const today = new Date().toLocaleDateString();
+            let content = `===== 基金监控记录（${today}）=====\n\n`;
+            
+            currentFunds.forEach(fund => {
+                content += `【${fund.name}】(${fund.code})\n`;
+                content += `当日涨跌：${fund.dailyChange} ${fund.isThreshold ? '[超阈值]' : ''}\n`;
+                content += `连续天数：${fund.continuousDays || 0}天\n`;
+                if (fund.totalChange) content += `累计涨跌：${fund.totalChange}\n`;
+                if (fundNotes[fund.code]) content += `备注：${fundNotes[fund.code]}\n`;
+                content += '\n';
+            });
+            
+            // 创建下载文件
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `基金监控记录_${today.replace(/\//g, '-')}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // 清除所有备注
+        function clearAllRecords() {
+            if (confirm('确定要清除所有备注记录吗？')) {
+                fundNotes = {};
+                localStorage.removeItem('fundNotes');
+                // 重新渲染备注输入框
+                document.querySelectorAll('.notes-input').forEach(input => {
+                    input.value = '';
+                });
+                updateRecordCount();
+                alert('所有备注已清除');
+            }
+        }
+
+        // 更新备注计数
+        function updateRecordCount() {
+            const count = Object.keys(fundNotes).filter(code => fundNotes[code]).length;
+            document.getElementById('recordedCount').textContent = count;
+        }
+    </script>
+</body>
+</html>

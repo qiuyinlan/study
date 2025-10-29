@@ -3,9 +3,10 @@
 """
 fund_signals_final_all.py
 - 自动抓取当日基金涨跌（fundgz / eastmoney）
-- 获取历史净值并计算概率连续同向涨跌段
+- 获取历史净值并计算连续同向涨跌段（从最近一天开始，按多数方向判定）
 - 自动计算信号强度
 - 输出 CSV: outputs/signals_YYYYMMDD.csv
+- 可选 --date 参数指定分析日期
 """
 
 import os
@@ -14,7 +15,7 @@ import json
 import re
 import requests
 import argparse
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 from typing import List, Optional
 
 # ========== 配置 ==========
@@ -68,14 +69,12 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 THRESHOLDS = {
     "daily_move_threshold": 1.5,      # 单日涨跌阈值
-    "window_days": 5,                  # 概率连续窗口天数
-    "prob_threshold": 0.6,             # 同向涨跌占比阈值
     "signal_strength_cutoff": 0.4
 }
 
 HEADERS = {"User-Agent": "python-requests/2.x (+https://github.com/)"}
 
-# ========== 数据抓取部分 ==========
+# ========== 数据抓取 ==========
 
 def fetch_fundgz(code: str) -> Optional[dict]:
     url = f"http://fundgz.1234567.com.cn/js/{code}.js"
@@ -104,64 +103,80 @@ def fetch_eastmoney(code: str) -> Optional[dict]:
     except Exception:
         return None
 
-def fetch_history(code: str, days: int = 20) -> List[float]:
-    """从天天基金抓取近 N 日涨跌幅"""
-    end = date.today()
-    start = end - timedelta(days=days * 2)
-    url = (
-        f"https://api.fund.eastmoney.com/f10/lsjz?fundCode={code}"
-        f"&pageIndex=1&pageSize={days}&startDate={start}&endDate={end}"
-    )
+def fetch_history_nav(code: str, days: int = 5) -> List[float]:
+    """从天天基金抓取最近 N 日涨跌"""
+    from datetime import datetime, timedelta
+    end = datetime.today()
+    start = end - timedelta(days=days*3)
+    url = "https://api.fund.eastmoney.com/f10/lsjz"
+    params = {
+        "fundCode": code,
+        "pageIndex": 1,
+        "pageSize": days*2,
+        "startDate": start.strftime("%Y-%m-%d"),
+        "endDate": end.strftime("%Y-%m-%d"),
+        "_": int(end.timestamp()*1000)
+    }
+    headers = HEADERS.copy()
+    headers["Referer"] = f"https://fundf10.eastmoney.com/jjjz_{code}.html"
     try:
-        r = requests.get(url, headers=HEADERS, timeout=8)
-        if r.status_code != 200:
-            return []
-        data = json.loads(r.text)
-        rows = data.get("Data", {}).get("LSJZList", [])
+        r = requests.get(url, headers=headers, params=params, timeout=8)
+        r.raise_for_status()
+        data = r.json()
+        lsjz = data.get("Data", {}).get("LSJZList", [])
         pct = []
-        for row in rows:
-            val = row.get("JZZZL", "")
-            if val and re.match(r"[\-\+]?\d+(\.\d+)?", val):
+        for row in reversed(lsjz):  # 从旧到新
+            val = row.get("JZZZL")
+            if val:
                 pct.append(float(val))
-        return list(reversed(pct))
-    except Exception:
+        return pct[:days]
+    except Exception as e:
+        print("异常:", e)
         return []
 
-# ========== 概率连续计算 ==========
+# ========== 连续计算（按多数方向判定） ==========
 
-def compute_probabilistic_consecutive(history: List[float], window: int = 5) -> (int, int, float):
+def compute_recent_consecutive(history: List[float]) -> (int, int, float):
     """
-    计算最近 window 天中同向涨跌占比
+    从最近一天开始，统计同向连续天数（多数方向判定，零天不算）
     返回：
-        window: 天数
-        count: 同向涨跌天数
-        ratio: 占比 (0~1)
+        consecutive_days, consecutive_direction (1=涨,-1=跌), consecutive_change_pct
     """
     if not history:
         return 0, 0, 0.0
-    recent = history[-window:]
-    ups = sum(1 for x in recent if x > 0)
-    downs = sum(1 for x in recent if x < 0)
-    if ups >= downs:
-        return window, ups, ups/window
-    else:
-        return window, downs, downs/window
+    # 判定多数方向
+    non_zero = [x for x in history if x != 0]
+    if not non_zero:
+        return 0, 0, 0.0
+    pos = sum(1 for x in non_zero if x > 0)
+    neg = sum(1 for x in non_zero if x < 0)
+    direction = 1 if pos >= neg else -1
+    # 统计连续天数
+    count, change_sum = 0, 0.0
+    for delta in reversed(history):
+        if delta == 0:
+            continue
+        cur_dir = 1 if delta > 0 else -1
+        if cur_dir == direction:
+            count += 1
+            change_sum += delta
+        else:
+            break
+    return count, direction, change_sum
 
 # ========== 信号生成 ==========
 
-def generate_signal(daily_change_pct, window, count, ratio):
-    sig, action, reasons, risk = "无操作", "", "", ""
+def generate_signal(daily_change_pct, consecutive_days, consecutive_change_pct):
+    sig, reasons, risk = "无操作", "", ""
     if abs(daily_change_pct) >= THRESHOLDS["daily_move_threshold"]:
         sig = "买入" if daily_change_pct > 0 else "减持"
-        action = "增配" if daily_change_pct > 0 else "减仓"
         reasons = f"单日涨跌 {daily_change_pct:.2f}% 超阈值"
         risk = "关注波动性"
-    elif ratio >= THRESHOLDS["prob_threshold"]:
+    elif consecutive_days >= 2:
         sig = "趋势提醒"
-        action = "观察"
-        reasons = f"最近 {window} 天同向涨跌 {count} 天，占比 {ratio:.2f}"
+        reasons = f"连续 {consecutive_days} 天同向涨跌 {consecutive_change_pct:.2f}%"
         risk = "趋势持续可能有机会或风险"
-    return sig, action, reasons, risk
+    return sig, reasons, risk
 
 # ========== 主流程 ==========
 
@@ -178,36 +193,34 @@ def main():
         data = fetch_fundgz(code) or fetch_eastmoney(code)
         daily_change_pct = float(data.get("gszzl", 0.0)) if data else 0.0
 
-        history = fetch_history(code, days=20)
-        window, count, ratio = compute_probabilistic_consecutive(history + [daily_change_pct], window=THRESHOLDS["window_days"])
+        history = fetch_history_nav(code, days=5) + [daily_change_pct]
+        consecutive_days, consecutive_direction, consecutive_change_pct = compute_recent_consecutive(history)
 
-        strength = min(1, ratio)  # 用占比作为信号强度
+        strength = min(1, abs(consecutive_change_pct)/10)  # 可按规则调整
 
-        sig, action, reasons, risk = generate_signal(daily_change_pct, window, count, ratio)
+        sig, reasons, risk = generate_signal(daily_change_pct, consecutive_days, consecutive_change_pct)
 
         results.append({
             "date": today,
             "name": name,
             "daily_change_pct": daily_change_pct,
-            "window_days": window,
-            "consecutive_count": count,
-            "consecutive_ratio": round(ratio, 2),
-            "signal_type": sig,
-            "strength": round(strength, 2),
+            "consecutive_days": consecutive_days,
+            "consecutive_direction": consecutive_direction,
+            "consecutive_change_pct": round(consecutive_change_pct,2),
+            "strength": round(strength,2),
             "reasons": reasons,
-            "action_suggestion": action,
-            "data_points_snapshot": f"{history + [daily_change_pct]}",
             "risk_warning": risk
         })
 
-    out_file = os.path.join(OUTPUT_DIR, f"signals_{today.replace('-', '')}.csv")
+    # 先按当日涨跌幅绝对值，从高到低；再按连续天数，从高到低
+    results.sort(key=lambda x: ( x["reasons"]), reverse=True)
+    out_file = os.path.join(OUTPUT_DIR, f"signals_{today.replace('-','')}.csv")
     with open(out_file, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(results[0].keys()))
         writer.writeheader()
         writer.writerows(results)
 
     print(f"✅ 已生成 {out_file}")
-
 
 if __name__ == "__main__":
     main()
